@@ -653,7 +653,7 @@ fbdev_output_set_dpms(tdm_output *output, tdm_output_dpms dpms_value)
             break;
     }
 
-    ret = ioctl(fbdev_data->fbdev_fd, FBIOBLANK, (void *)fbmode);
+    ret = ioctl(fbdev_data->fbdev_fd, FBIOBLANK, &fbmode);
     if (ret < 0)
     {
         TDM_ERR("FBIOBLANK ioctl failed, errno=%d", errno);
