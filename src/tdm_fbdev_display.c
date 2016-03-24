@@ -322,31 +322,6 @@ fbdev_display_get_fd(tdm_backend_data *bdata, int *fd)
 }
 
 tdm_error
-fbdev_display_get_buffer_fd(tdm_backend_data *bdata, int *fd)
-{
-    tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *)bdata;
-    int bufmgr_fd;
-
-    RETURN_VAL_IF_FAIL(fbdev_data, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(fd, TDM_ERROR_INVALID_PARAMETER);
-
-    /*
-     * We assume that shared memory backend will be used, howewer tbm buffer
-     *  manager uses dup() system call on received filed descriptor, that is
-     *  why we must provide tbm buffer manager with valid file descriptor
-     */
-
-
-
-    bufmgr_fd = open("/tmp/tdm_fbdev_bufmng", O_RDWR | O_CREAT | O_TRUNC, ACCESSPERMS);
-    TDM_INFO("Open fake file: /tdm_fbdev_bufmgr %d", bufmgr_fd);
-
-    *fd = bufmgr_fd;
-
-    return TDM_ERROR_NONE;
-}
-
-tdm_error
 fbdev_display_handle_events(tdm_backend_data *bdata)
 {
     tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *) bdata;
