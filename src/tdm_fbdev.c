@@ -14,7 +14,6 @@ static tdm_func_display fbdev_func_display =
     NULL,  //display_get_capture_capability
     fbdev_display_get_outputs,
     fbdev_display_get_fd,
-    fbdev_display_get_buffer_fd,
     fbdev_display_handle_events,
     NULL,  //display_create_pp,
 };
