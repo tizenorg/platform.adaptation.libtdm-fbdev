@@ -7,47 +7,6 @@
 
 #define TDM_FBDEV_NAME "fbdev"
 
-static tdm_func_display fbdev_func_display =
-{
-    fbdev_display_get_capabilitiy,
-    NULL,  //display_get_pp_capability,
-    NULL,  //display_get_capture_capability
-    fbdev_display_get_outputs,
-    fbdev_display_get_fd,
-    fbdev_display_handle_events,
-    NULL,  //display_create_pp,
-};
-
-static tdm_func_output fbdev_func_output =
-{
-    fbdev_output_get_capability,
-    fbdev_output_get_layers,
-    fbdev_output_set_property,
-    fbdev_output_get_property,
-    fbdev_output_wait_vblank,
-    fbdev_output_set_vblank_handler,
-    fbdev_output_commit,
-    fbdev_output_set_commit_handler,
-    fbdev_output_set_dpms,
-    fbdev_output_get_dpms,
-    fbdev_output_set_mode,
-    fbdev_output_get_mode,
-    NULL,   //output_create_capture
-};
-
-static tdm_func_layer fbdev_func_layer =
-{
-    fbdev_layer_get_capability,
-    fbdev_layer_set_property,
-    fbdev_layer_get_property,
-    fbdev_layer_set_info,
-    fbdev_layer_get_info,
-    fbdev_layer_set_buffer,
-    fbdev_layer_unset_buffer,
-    NULL,    //layer_set_video_pos
-    NULL,    //layer_create_capture
-};
-
 static tdm_fbdev_data *fbdev_data;
 
 static int
@@ -242,7 +201,11 @@ tdm_fbdev_deinit(tdm_backend_data *bdata)
 tdm_backend_data*
 tdm_fbdev_init(tdm_display *dpy, tdm_error *error)
 {
+    tdm_func_display fbdev_func_display;
+    tdm_func_output fbdev_func_output;
+    tdm_func_layer fbdev_func_layer;
     tdm_error ret;
+
     if (!dpy)
     {
         TDM_ERR("display is null");
@@ -269,6 +232,35 @@ tdm_fbdev_init(tdm_display *dpy, tdm_error *error)
     }
 
     LIST_INITHEAD(&fbdev_data->buffer_list);
+
+    memset(&fbdev_func_display, 0, sizeof(fbdev_func_display));
+    fbdev_func_display.display_get_capabilitiy = fbdev_display_get_capabilitiy;
+    fbdev_func_display.display_get_outputs = fbdev_display_get_outputs;
+    fbdev_func_display.display_get_fd = fbdev_display_get_fd;
+    fbdev_func_display.display_handle_events = fbdev_display_handle_events;
+
+    memset(&fbdev_func_output, 0, sizeof(fbdev_func_output));
+    fbdev_func_output.output_get_capability = fbdev_output_get_capability;
+    fbdev_func_output.output_get_layers = fbdev_output_get_layers;
+    fbdev_func_output.output_set_property = fbdev_output_set_property;
+    fbdev_func_output.output_get_property = fbdev_output_get_property;
+    fbdev_func_output.output_wait_vblank = fbdev_output_wait_vblank;
+    fbdev_func_output.output_set_vblank_handler = fbdev_output_set_vblank_handler;
+    fbdev_func_output.output_commit = fbdev_output_commit;
+    fbdev_func_output.output_set_commit_handler = fbdev_output_set_commit_handler;
+    fbdev_func_output.output_set_dpms = fbdev_output_set_dpms;
+    fbdev_func_output.output_get_dpms = fbdev_output_get_dpms;
+    fbdev_func_output.output_set_mode = fbdev_output_set_mode;
+    fbdev_func_output.output_get_mode = fbdev_output_get_mode;
+
+    memset(&fbdev_func_layer, 0, sizeof(fbdev_func_layer));
+    fbdev_func_layer.layer_get_capability = fbdev_layer_get_capability;
+    fbdev_func_layer.layer_set_property = fbdev_layer_set_property;
+    fbdev_func_layer.layer_get_property = fbdev_layer_get_property;
+    fbdev_func_layer.layer_set_info = fbdev_layer_set_info;
+    fbdev_func_layer.layer_get_info = fbdev_layer_get_info;
+    fbdev_func_layer.layer_set_buffer = fbdev_layer_set_buffer;
+    fbdev_func_layer.layer_unset_buffer = fbdev_layer_unset_buffer;
 
     ret = tdm_backend_register_func_display(dpy, &fbdev_func_display);
     if (ret != TDM_ERROR_NONE)
