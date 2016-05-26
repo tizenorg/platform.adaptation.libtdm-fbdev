@@ -22,7 +22,7 @@
 #include <tdm_log.h>
 #include <tdm_list.h>
 
-#define MAX_BUF 3
+#define MAX_BUF 1
 
 /* fbdev backend functions (display) */
 tdm_error    fbdev_display_get_capabilitiy(tdm_backend_data *bdata, tdm_caps_display *caps);
