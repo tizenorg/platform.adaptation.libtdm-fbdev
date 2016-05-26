@@ -337,29 +337,6 @@ failed_get:
 }
 
 tdm_error
-fbdev_display_get_fd(tdm_backend_data *bdata, int *fd)
-{
-    tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *)bdata;
-    int file_fd;
-
-    RETURN_VAL_IF_FAIL(fbdev_data, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(fd, TDM_ERROR_INVALID_PARAMETER);
-
-    /*
-     * Event-based applications use poll/select for pageflip or vsync events,
-     *  since farmebuffer does not produce such events we create common file.
-     *  Without this file application will be locked on poll/select or return
-     *  an error after timer expiring.
-     */
-    file_fd = open("/tmp/tdm_fbdev_select", O_RDWR | O_CREAT | O_TRUNC, ACCESSPERMS);
-    TDM_INFO("Open fake file: /tmp/tdm_fbdev_select %d", file_fd);
-
-    *fd = file_fd;
-
-    return TDM_ERROR_NONE;
-}
-
-tdm_error
 fbdev_display_handle_events(tdm_backend_data *bdata)
 {
     tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *) bdata;
