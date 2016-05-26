@@ -151,7 +151,7 @@ tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
      * TODO: Size of framebuffer must be aligned to system page size before
      *  it is mapped
      */
-    size = fbdev_data->vinfo->xres * fbdev_data->vinfo->yres * fbdev_data->vinfo->bits_per_pixel / 8 * MAX_BUF;
+    size = fbdev_data->vinfo->xres * fbdev_data->vinfo->yres_virtual;
 
     TDM_INFO("\n"
              "MMaped size: %zu\n",

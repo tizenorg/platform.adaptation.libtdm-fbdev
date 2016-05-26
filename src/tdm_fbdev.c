@@ -66,50 +66,10 @@ _tdm_fbdev_init_internal(void)
     vinfo->transp.offset  = 0;
     vinfo->transp.length  = 0;
 
-    /*
-     * Almost all framebuffers support off screen rendering.
-     * The code bellow requests Framebuffer to allocate memory equals to three
-     * buffers each of which width*height size. While the first drawn
-     * framebuffer's area is displaying the second or the third is redrawing
-     * or compositing by some application. When timer was expired or vblank
-     * was received Framebufer's areas swap, thus the second or the third is
-     * displaying and first is redrawing or compositing. Simple representation
-     * of what was said bellow
-     *
-     *                    SWAP Event                SWAP Event
-     *                        |                         |
-     *    +-------------+     |     +-------------+     |      +-------------+
-     *    |             |     |     |             |     |      |  Redrawing  |
-     *    | Displaying  |     |     |   queued    |     |      |     or      |
-     *    |             |     |     |             |     |      | Compositing |
-     *    +-------------+     |     +-------------+     |      +-------------+
-     *    |  Redrawing  |     |     |             |     |      |             |
-     *    |     or      | +-------> | Displaying  | +--------> |   queued    |
-     *    | Compositing |     |     |             |     |      |             |
-     *    +-------------+     |     +-------------+     |      +-------------+
-     *    |             |     |     |  Redrawing  |     |      |             |
-     *    |   queued    |     |     |     or      |     |      | Displaying  |
-     *    |             |     |     | Compositing |     |      |             |
-     *    +-------------+     |     +-------------+     |      +-------------+
-     *                        |                         |
-     */
-    /*
-     * TODO: Implement off screen rendering
-     */
-    vinfo->yres_virtual = vinfo->yres * MAX_BUF;
-
-    ret = ioctl(fbdev_data->fbdev_fd, FBIOPAN_DISPLAY, vinfo);
-    if(ret < 0)
-    {
-        TDM_INFO("page flip not supported,  errno=%d", errno);
-        vinfo->yres_virtual = vinfo->yres;
-    }
-
     ret = ioctl(fbdev_data->fbdev_fd, FBIOPAN_DISPLAY, vinfo);
     if(ret < 0)
     {
         TDM_ERR("FBIOPAN_DISPLAY ioctl failed, errno=%d", errno);
-        goto close_1;
     }
 
     ret = ioctl(fbdev_data->fbdev_fd, FBIOGET_FSCREENINFO, finfo);
