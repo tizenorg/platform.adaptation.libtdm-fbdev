@@ -91,6 +91,48 @@ _tdm_fbdev_layer_is_supproted_format()
 }
 */
 
+static inline uint32_t
+_get_refresh (struct fb_var_screeninfo *timing)
+{
+    uint32_t pixclock, hfreq, htotal, vtotal;
+
+    pixclock = PICOS2KHZ(timing->pixclock) * 1000;
+
+    htotal = timing->xres + timing->right_margin + timing->hsync_len + timing->left_margin;
+    vtotal = timing->yres + timing->lower_margin + timing->vsync_len + timing->upper_margin;
+
+    if (timing->vmode & FB_VMODE_INTERLACED) vtotal /= 2;
+    if (timing->vmode & FB_VMODE_DOUBLE) vtotal *= 2;
+
+    hfreq = pixclock / htotal;
+    return hfreq / vtotal;
+}
+
+/*
+ * Convert fb_var_screeninfo to tdm_output_mode
+ */
+static inline void
+_tdm_fbdev_display_to_tdm_mode(struct fb_var_screeninfo *timing, tdm_output_mode *mode)
+{
+
+    if (!timing->pixclock) return;
+
+    mode->clock = timing->pixclock / 1000;
+    mode->vrefresh = _get_refresh (timing);
+    mode->hdisplay = timing->xres;
+    mode->hsync_start = mode->hdisplay + timing->right_margin;
+    mode->hsync_end = mode->hsync_start + timing->hsync_len;
+    mode->htotal = mode->hsync_end + timing->left_margin;
+
+    mode->vdisplay = timing->yres;
+    mode->vsync_start = mode->vdisplay + timing->lower_margin;
+    mode->vsync_end = mode->vsync_start + timing->vsync_len;
+    mode->vtotal = mode->vsync_end + timing->upper_margin;
+
+    int interlaced = !!(timing->vmode & FB_VMODE_INTERLACED);
+    snprintf (mode->name, TDM_NAME_LEN, "%dx%d%s", mode->hdisplay, mode->vdisplay, interlaced ? "i" : "");
+}
+
 tdm_error
 tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 {
@@ -156,11 +198,7 @@ tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 
     for(i = 0; i < output->count_modes ; i++)
     {
-        output->output_modes[i].hdisplay = fbdev_data->vinfo->xres;
-        output->output_modes[i].vdisplay = fbdev_data->vinfo->yres;
-        output->output_modes[i].vrefresh = 60;
-        output->output_modes[i].flags = -1;
-        output->output_modes[i].type = -1;
+        _tdm_fbdev_display_to_tdm_mode(fbdev_data->vinfo, &output->output_modes[i]);
 
         sprintf(output->output_modes[i].name, "%dx%d",
                 fbdev_data->vinfo->xres,
@@ -686,7 +724,7 @@ fbdev_output_get_mode(tdm_output *output, const tdm_output_mode **mode)
     tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
 
     RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(*mode, TDM_ERROR_INVALID_PARAMETER);
+    RETURN_VAL_IF_FAIL(mode, TDM_ERROR_INVALID_PARAMETER);
 
     *mode = fbdev_output->current_mode;
 
