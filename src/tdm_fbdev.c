@@ -236,8 +236,8 @@ tdm_fbdev_init(tdm_display *dpy, tdm_error *error)
     memset(&fbdev_func_display, 0, sizeof(fbdev_func_display));
     fbdev_func_display.display_get_capabilitiy = fbdev_display_get_capabilitiy;
     fbdev_func_display.display_get_outputs = fbdev_display_get_outputs;
-    fbdev_func_display.display_get_fd = fbdev_display_get_fd;
-    fbdev_func_display.display_handle_events = fbdev_display_handle_events;
+    fbdev_func_display.display_get_fd = NULL;
+    fbdev_func_display.display_handle_events = NULL;
 
     memset(&fbdev_func_output, 0, sizeof(fbdev_func_output));
     fbdev_func_output.output_get_capability = fbdev_output_get_capability;
