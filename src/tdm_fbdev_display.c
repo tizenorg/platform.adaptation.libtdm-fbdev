@@ -180,6 +180,7 @@ tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 
     output->is_vblank = DOWN;
     output->is_commit = DOWN;
+    output->sequence  = 1;
 
     /*
      * TODO: connector_type_id field relates to libdrm connector which framebuffer
@@ -579,12 +580,11 @@ fbdev_output_commit(tdm_output *output, int sync, void *user_data)
      */
     memcpy(fbdev_output->mem, display_buffer->mem, display_buffer->size * sizeof(char) );
 
-
-    /*
-     * Up fake flag to simulate page flip event
-     */
-    fbdev_output->is_commit = UP;
-    fbdev_output->user_data = user_data;
+    if (fbdev_output->commit_func) 
+    {
+        TDM_ERR("trace");
+        fbdev_output->commit_func((tdm_output *)output, fbdev_output->sequence++, 0, 0, user_data);
+    }
 
     return TDM_ERROR_NONE;
 }

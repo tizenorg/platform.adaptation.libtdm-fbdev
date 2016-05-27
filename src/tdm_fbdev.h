@@ -126,6 +126,9 @@ struct _tdm_fbdev_output_data
      */
     int is_vblank;
     int is_commit;
+
+    int sequence;
+
 };
 
 struct _tdm_fbdev_layer_data
