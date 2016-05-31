@@ -12,100 +12,90 @@
 /*
  * Framebuffer device supported formats
  */
-static tbm_format supported_formats[] =
-{
-    /*
-     * TODO: add support of 16 bit formats
-     */
-    TBM_FORMAT_ARGB8888,
-    TBM_FORMAT_ABGR8888,
-    TBM_FORMAT_RGBA8888,
-    TBM_FORMAT_BGRA8888,
+static tbm_format supported_formats[] = {
+	/*
+	 * TODO: add support of 16 bit formats
+	 */
+	TBM_FORMAT_ARGB8888,
+	TBM_FORMAT_ABGR8888,
+	TBM_FORMAT_RGBA8888,
+	TBM_FORMAT_BGRA8888,
 };
 
 static tdm_fbdev_display_buffer*
 _tdm_fbdev_display_find_buffer(tdm_fbdev_data *fbdev_data, tbm_surface_h buffer)
 {
-    tdm_fbdev_display_buffer *display_buffer = NULL;
+	tdm_fbdev_display_buffer *display_buffer = NULL;
 
-    LIST_FOR_EACH_ENTRY(display_buffer, &fbdev_data->buffer_list, link)
-    {
-        if (display_buffer->buffer == buffer)
-            return display_buffer;
-    }
+	LIST_FOR_EACH_ENTRY(display_buffer, &fbdev_data->buffer_list, link)
+	{
+		if (display_buffer->buffer == buffer)
+			return display_buffer;
+	}
 
-    return NULL;
+	return NULL;
 }
 
 static void
 _tdm_fbdev_display_cb_destroy_buffer(tbm_surface_h buffer, void *user_data)
 {
-    tdm_fbdev_data *fbdev_data;
-    tdm_fbdev_display_buffer *display_buffer;
-    tbm_bo bo;
+	tdm_fbdev_data *fbdev_data;
+	tdm_fbdev_display_buffer *display_buffer;
+	tbm_bo bo;
 
-    if (!user_data)
-    {
-        TDM_ERR("no user_data");
-        return;
-    }
-    if (!buffer)
-    {
-        TDM_ERR("no buffer");
-        return;
-    }
+	if (!user_data) {
+		TDM_ERR("no user_data");
+		return;
+	}
+	if (!buffer) {
+		TDM_ERR("no buffer");
+		return;
+	}
 
-    fbdev_data = (tdm_fbdev_data *)user_data;
+	fbdev_data = (tdm_fbdev_data *) user_data;
 
-    display_buffer = _tdm_fbdev_display_find_buffer(fbdev_data, buffer);
-    if (!display_buffer)
-    {
-        TDM_ERR("no display_buffer");
-        return;
-    }
+	display_buffer = _tdm_fbdev_display_find_buffer(fbdev_data, buffer);
+	if (!display_buffer) {
+		TDM_ERR("no display_buffer");
+		return;
+	}
 
-    LIST_DEL(&display_buffer->link);
+	LIST_DEL(&display_buffer->link);
 
-    if(display_buffer->mem != NULL)
-    {
-        bo = tbm_surface_internal_get_bo(buffer, 0);
+	if (display_buffer->mem != NULL) {
+		bo = tbm_surface_internal_get_bo(buffer, 0);
 
-        /*
-         * TODO: Check tbm_bo_unmap return status
-         */
-        tbm_bo_unmap(bo);
+		/*
+		 * TODO: Check tbm_bo_unmap return status
+		 */
+		tbm_bo_unmap(bo);
 
-        TDM_DBG("unmap success");
-    }
-    else
-        TDM_DBG("unmap was not called");
+		TDM_DBG("unmap success");
+	} else {
+		TDM_DBG("unmap was not called");
+	}
 
-    free(display_buffer);
+	free(display_buffer);
 }
 
-/*
-static int
-_tdm_fbdev_layer_is_supproted_format()
-{
-
-}
-*/
 
 static inline uint32_t
-_get_refresh (struct fb_var_screeninfo *timing)
+_get_refresh(struct fb_var_screeninfo *timing)
 {
-    uint32_t pixclock, hfreq, htotal, vtotal;
+	uint32_t pixclock, hfreq, htotal, vtotal;
 
-    pixclock = PICOS2KHZ(timing->pixclock) * 1000;
+	pixclock = PICOS2KHZ(timing->pixclock) * 1000;
 
-    htotal = timing->xres + timing->right_margin + timing->hsync_len + timing->left_margin;
-    vtotal = timing->yres + timing->lower_margin + timing->vsync_len + timing->upper_margin;
+	htotal = timing->xres + timing->right_margin + timing->hsync_len + timing->left_margin;
+	vtotal = timing->yres + timing->lower_margin + timing->vsync_len + timing->upper_margin;
 
-    if (timing->vmode & FB_VMODE_INTERLACED) vtotal /= 2;
-    if (timing->vmode & FB_VMODE_DOUBLE) vtotal *= 2;
+	if (timing->vmode & FB_VMODE_INTERLACED)
+		vtotal /= 2;
+	if (timing->vmode & FB_VMODE_DOUBLE)
+		vtotal *= 2;
 
-    hfreq = pixclock / htotal;
-    return hfreq / vtotal;
+	hfreq = pixclock / htotal;
+	return hfreq / vtotal;
 }
 
 /*
@@ -115,783 +105,755 @@ static inline void
 _tdm_fbdev_display_to_tdm_mode(struct fb_var_screeninfo *timing, tdm_output_mode *mode)
 {
 
-    if (!timing->pixclock) return;
+	if (!timing->pixclock)
+		return;
 
-    mode->clock = timing->pixclock / 1000;
-    mode->vrefresh = _get_refresh (timing);
-    mode->hdisplay = timing->xres;
-    mode->hsync_start = mode->hdisplay + timing->right_margin;
-    mode->hsync_end = mode->hsync_start + timing->hsync_len;
-    mode->htotal = mode->hsync_end + timing->left_margin;
+	mode->clock = timing->pixclock / 1000;
+	mode->vrefresh = _get_refresh(timing);
+	mode->hdisplay = timing->xres;
+	mode->hsync_start = mode->hdisplay + timing->right_margin;
+	mode->hsync_end = mode->hsync_start + timing->hsync_len;
+	mode->htotal = mode->hsync_end + timing->left_margin;
 
-    mode->vdisplay = timing->yres;
-    mode->vsync_start = mode->vdisplay + timing->lower_margin;
-    mode->vsync_end = mode->vsync_start + timing->vsync_len;
-    mode->vtotal = mode->vsync_end + timing->upper_margin;
+	mode->vdisplay = timing->yres;
+	mode->vsync_start = mode->vdisplay + timing->lower_margin;
+	mode->vsync_end = mode->vsync_start + timing->vsync_len;
+	mode->vtotal = mode->vsync_end + timing->upper_margin;
 
-    int interlaced = !!(timing->vmode & FB_VMODE_INTERLACED);
-    snprintf (mode->name, TDM_NAME_LEN, "%dx%d%s", mode->hdisplay, mode->vdisplay, interlaced ? "i" : "");
+	int interlaced = !!(timing->vmode & FB_VMODE_INTERLACED);
+	snprintf(mode->name, TDM_NAME_LEN, "%dx%d%s", mode->hdisplay, mode->vdisplay, interlaced ? "i" : "");
 }
 
 tdm_error
 tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 {
-    tdm_fbdev_output_data *output = NULL;
-    size_t size;
-    int i = 0;
+	tdm_fbdev_output_data *output = NULL;
+	size_t size;
+	int i = 0;
 
-    output = calloc(1, sizeof(tdm_fbdev_output_data));
-    if (output == NULL)
-    {
-        TDM_ERR("alloc output failed");
-        return TDM_ERROR_OUT_OF_MEMORY;
-    }
+	output = calloc(1, sizeof(tdm_fbdev_output_data));
+	if (output == NULL) {
+		TDM_ERR("alloc output failed");
+		return TDM_ERROR_OUT_OF_MEMORY;
+	}
 
-    /*
-     * TODO: Size of framebuffer must be aligned to system page size before
-     *  it is mapped
-     */
-    size = fbdev_data->vinfo->xres * fbdev_data->vinfo->yres * fbdev_data->vinfo->bits_per_pixel / 8 * MAX_BUF;
+	/*
+	 * TODO: Size of framebuffer must be aligned to system page size before
+	 *  it is mapped
+	 */
+	size = fbdev_data->vinfo->xres * fbdev_data->vinfo->yres * fbdev_data->vinfo->bits_per_pixel / 8 * MAX_BUF;
 
-    TDM_INFO("\n"
-             "MMaped size: %zu\n",
-             size);
+	TDM_INFO("\n" "MMaped size: %zu\n", size);
 
-    output->mem = mmap(0, size, PROT_READ|PROT_WRITE,
-            MAP_SHARED, fbdev_data->fbdev_fd, 0);
-    if (output->mem == MAP_FAILED)
-    {
-        TDM_ERR("MMap framebuffer failed, errno=%d", errno);
-        return TDM_ERROR_OPERATION_FAILED;
-    }
+	output->mem = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, fbdev_data->fbdev_fd, 0);
+	if (output->mem == MAP_FAILED) {
+		TDM_ERR("MMap framebuffer failed, errno=%d", errno);
+		return TDM_ERROR_OPERATION_FAILED;
+	}
 
-    memset(output->mem, 0, size);
+	memset(output->mem, 0, size);
 
-    output->width = fbdev_data->vinfo->xres;
-    output->height = fbdev_data->vinfo->yres;
-    output->pitch = fbdev_data->vinfo->width;
-    output->bpp = fbdev_data->vinfo->bits_per_pixel;
-    output->size = size;
-    output->max_width  = fbdev_data->vinfo->xres_virtual;
-    output->max_height = fbdev_data->vinfo->yres_virtual;
+	output->width = fbdev_data->vinfo->xres;
+	output->height = fbdev_data->vinfo->yres;
+	output->pitch = fbdev_data->vinfo->width;
+	output->bpp = fbdev_data->vinfo->bits_per_pixel;
+	output->size = size;
+	output->max_width = fbdev_data->vinfo->xres_virtual;
+	output->max_height = fbdev_data->vinfo->yres_virtual;
 
-    output->status = TDM_OUTPUT_CONN_STATUS_CONNECTED;
-    output->connector_type = TDM_OUTPUT_TYPE_LVDS;
+	output->status = TDM_OUTPUT_CONN_STATUS_CONNECTED;
+	output->connector_type = TDM_OUTPUT_TYPE_LVDS;
 
-    output->is_vblank = DOWN;
-    output->is_commit = DOWN;
-    output->sequence  = 1;
+	output->is_vblank = DOWN;
+	output->is_commit = DOWN;
+	output->sequence = 1;
 
-    /*
-     * TODO: connector_type_id field relates to libdrm connector which framebuffer
-     *  does not know. It have to be checked whether softaware above us use this
-     *  field for its purposes.
-     */
-    output->connector_type_id = 1;
+	/*
+	 * TODO: connector_type_id field relates to libdrm connector which framebuffer
+	 *  does not know. It have to be checked whether softaware above us use this
+	 *  field for its purposes.
+	 */
+	output->connector_type_id = 1;
 
-    output->count_modes = 1;
-    output->output_modes = calloc(output->count_modes, sizeof(tdm_output_mode));
-    if (!output->output_modes)
-    {
-        TDM_ERR("failed: alloc memory");
-        return TDM_ERROR_OUT_OF_MEMORY;
-    }
+	output->count_modes = 1;
+	output->output_modes = calloc(output->count_modes, sizeof(tdm_output_mode));
+	if (!output->output_modes) {
+		TDM_ERR("failed: alloc memory");
+		return TDM_ERROR_OUT_OF_MEMORY;
+	}
 
-    for(i = 0; i < output->count_modes ; i++)
-    {
-        _tdm_fbdev_display_to_tdm_mode(fbdev_data->vinfo, &output->output_modes[i]);
+	for (i = 0; i < output->count_modes; i++) {
+		_tdm_fbdev_display_to_tdm_mode(fbdev_data->vinfo, &output->output_modes[i]);
 
-        sprintf(output->output_modes[i].name, "%dx%d",
-                fbdev_data->vinfo->xres,
-                fbdev_data->vinfo->yres);
-    }
+		sprintf(output->output_modes[i].name, "%dx%d", fbdev_data->vinfo->xres, fbdev_data->vinfo->yres);
+	}
 
-    /*
-     * We currently support only one mode
-     */
-    if (output->count_modes == 1)
-        output->current_mode = &output->output_modes[0];
+	/*
+	 * We currently support only one mode
+	 */
+	if (output->count_modes == 1)
+		output->current_mode = &output->output_modes[0];
 
-    output->fbdev_data = fbdev_data;
-    fbdev_data->fbdev_output = output;
+	output->fbdev_data = fbdev_data;
+	fbdev_data->fbdev_output = output;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 void
 tdm_fbdev_destroy_output(tdm_fbdev_data *fbdev_data)
 {
-    tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
+	tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
 
-    if (fbdev_output == NULL)
-        goto close;
+	if (fbdev_output == NULL)
+		goto close;
 
-    if (fbdev_output->mem == NULL)
-        goto close_2;
+	if (fbdev_output->mem == NULL)
+		goto close_2;
 
-    munmap(fbdev_output->mem, fbdev_output->size);
+	munmap(fbdev_output->mem, fbdev_output->size);
 
-    if (fbdev_output->output_modes == NULL)
-        goto close_2;
+	if (fbdev_output->output_modes == NULL)
+		goto close_2;
 
-    free(fbdev_output->output_modes);
+	free(fbdev_output->output_modes);
 
 close_2:
-    free(fbdev_output);
+	free(fbdev_output);
 close:
-    return;
+	return;
 }
 
 tdm_error
 tdm_fbdev_creat_layer(tdm_fbdev_data *fbdev_data)
 {
-    tdm_fbdev_layer_data *layer;
-    tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
+	tdm_fbdev_layer_data *layer;
+	tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
 
-    /*
-     * Framebuffer does not support layer, therefore create only
-     *  one layer by libtdm's demand;
-     */
-    layer = calloc(1, sizeof(tdm_fbdev_layer_data));
-    if (layer == NULL)
-    {
-        TDM_ERR("alloc output failed");
-        return TDM_ERROR_OUT_OF_MEMORY;
-    }
+	/*
+	 * Framebuffer does not support layer, therefore create only
+	 *  one layer by libtdm's demand;
+	 */
+	layer = calloc(1, sizeof(tdm_fbdev_layer_data));
+	if (layer == NULL) {
+		TDM_ERR("alloc output failed");
+		return TDM_ERROR_OUT_OF_MEMORY;
+	}
 
-    layer->capabilities = TDM_LAYER_CAPABILITY_PRIMARY | TDM_LAYER_CAPABILITY_GRAPHIC;
+	layer->capabilities = TDM_LAYER_CAPABILITY_PRIMARY | TDM_LAYER_CAPABILITY_GRAPHIC;
 
-    layer->fbdev_data = fbdev_data;
-    layer->fbdev_output = fbdev_output;
-    fbdev_output->fbdev_layer = layer;
+	layer->fbdev_data = fbdev_data;
+	layer->fbdev_output = fbdev_output;
+	fbdev_output->fbdev_layer = layer;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 void
 tdm_fbdev_destroy_layer(tdm_fbdev_data *fbdev_data)
 {
-    tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
-    tdm_fbdev_layer_data *layer = fbdev_output->fbdev_layer;
+	tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
+	tdm_fbdev_layer_data *layer = fbdev_output->fbdev_layer;
 
-    if(layer != NULL)
-        free(layer);
+	if (layer != NULL)
+		free(layer);
 }
 
 tdm_error
 fbdev_display_get_capabilitiy(tdm_backend_data *bdata, tdm_caps_display *caps)
 {
-    RETURN_VAL_IF_FAIL(caps, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(caps, TDM_ERROR_INVALID_PARAMETER);
 
-    /*
-     * Framebuffer does not support layer, therefore create only
-     *  one layer by libtdm's demand;
-     */
-    caps->max_layer_count = 1;
+	/*
+	 * Framebuffer does not support layer, therefore create only
+	 *  one layer by libtdm's demand;
+	 */
+	caps->max_layer_count = 1;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_output**
 fbdev_display_get_outputs(tdm_backend_data *bdata, int *count, tdm_error *error)
 {
-    tdm_fbdev_data *fbdev_data = bdata;
-    tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
-    tdm_output **outputs;
-    tdm_error ret;
+	tdm_fbdev_data *fbdev_data = bdata;
+	tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
+	tdm_output **outputs;
+	tdm_error ret;
 
-    RETURN_VAL_IF_FAIL(fbdev_data, NULL);
-    RETURN_VAL_IF_FAIL(count, NULL);
+	RETURN_VAL_IF_FAIL(fbdev_data, NULL);
+	RETURN_VAL_IF_FAIL(count, NULL);
 
-    if (fbdev_output == NULL)
-    {
-        ret = TDM_ERROR_NONE;
-        goto failed_get;
-    }
+	if (fbdev_output == NULL) {
+		ret = TDM_ERROR_NONE;
+		goto failed_get;
+	}
 
-    /*
-     * Since it is Framebuffer device there is only one output
-     */
-    *count = 1;
+	/*
+	 * Since it is Framebuffer device there is only one output
+	 */
+	*count = 1;
 
-    /* will be freed in frontend */
-    outputs = calloc(*count, sizeof(tdm_fbdev_output_data*));
-    if (!outputs)
-    {
-        TDM_ERR("failed: alloc memory");
-        *count = 0;
-        ret = TDM_ERROR_OUT_OF_MEMORY;
-        goto failed_get;
-    }
+	/* will be freed in frontend */
+	outputs = calloc(*count, sizeof(tdm_fbdev_output_data*));
+	if (!outputs) {
+		TDM_ERR("failed: alloc memory");
+		*count = 0;
+		ret = TDM_ERROR_OUT_OF_MEMORY;
+		goto failed_get;
+	}
 
-    outputs[0] = fbdev_output;
+	outputs[0] = fbdev_output;
 
-    if (error)
-        *error = TDM_ERROR_NONE;
+	if (error)
+		*error = TDM_ERROR_NONE;
 
-    return outputs;
+	return outputs;
 
 failed_get:
-    if (error)
-        *error = ret;
-    return NULL;
+
+	if (error)
+		*error = ret;
+	return NULL;
 }
 
 tdm_error
 fbdev_display_handle_events(tdm_backend_data *bdata)
 {
-    tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *) bdata;
-    void *user_data;
-    tdm_fbdev_output_data *fbdev_output;
-    unsigned int sequence = 0;
-    unsigned int tv_sec = 0;
-    unsigned int tv_usec = 0;
+	tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *) bdata;
+	void *user_data;
+	tdm_fbdev_output_data *fbdev_output;
+	unsigned int sequence = 0;
+	unsigned int tv_sec = 0;
+	unsigned int tv_usec = 0;
 
-    RETURN_VAL_IF_FAIL(fbdev_data, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_data, TDM_ERROR_INVALID_PARAMETER);
 
-    fbdev_output = fbdev_data->fbdev_output;
-    user_data = fbdev_output->user_data;
+	fbdev_output = fbdev_data->fbdev_output;
+	user_data = fbdev_output->user_data;
 
-    RETURN_VAL_IF_FAIL(user_data, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(user_data, TDM_ERROR_INVALID_PARAMETER);
 
-    /*
-    (tdm_output *output, unsigned int sequence,
-     unsigned int tv_sec, unsigned int tv_usec,
-     void *user_data);
-    */
+	/*
+	 (tdm_output *output, unsigned int sequence,
+	 unsigned int tv_sec, unsigned int tv_usec,
+	 void *user_data);
+	 */
 
-    /*
-     * Framebuffer does not produce events
-     * Fake flags are used to simulate event-operated back end. Since tdm
-     *  library assumes its back ends to be event-operated and Framebuffer
-     *  device is not event-operated we have to make fake events
-     */
-    if (fbdev_output->is_vblank && fbdev_output->vblank_func)
-    {
-        fbdev_output->is_vblank = DOWN;
+	/*
+	 * Framebuffer does not produce events
+	 * Fake flags are used to simulate event-operated back end. Since tdm
+	 *  library assumes its back ends to be event-operated and Framebuffer
+	 *  device is not event-operated we have to make fake events
+	 */
+	if (fbdev_output->is_vblank && fbdev_output->vblank_func) {
+		fbdev_output->is_vblank = DOWN;
 
-        fbdev_output->vblank_func((tdm_output *)fbdev_data,
-                                   sequence, tv_sec,
-                                   tv_usec, user_data);
-    }
+		fbdev_output->vblank_func((tdm_output *) fbdev_data, sequence, tv_sec, tv_usec, user_data);
+	}
 
-    if (fbdev_output->is_commit && fbdev_output->commit_func)
-    {
-        fbdev_output->is_commit = DOWN;
+	if (fbdev_output->is_commit && fbdev_output->commit_func) {
+		fbdev_output->is_commit = DOWN;
 
-        fbdev_output->commit_func((tdm_output *)fbdev_data,
-                                   sequence, tv_sec,
-                                   tv_usec, user_data);
-    }
+		fbdev_output->commit_func((tdm_output *) fbdev_data, sequence, tv_sec, tv_usec, user_data);
+	}
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_get_capability(tdm_output *output, tdm_caps_output *caps)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
-    tdm_fbdev_data *fbdev_data = NULL;
-    tdm_error ret;
-    int i = 0;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
+	tdm_fbdev_data *fbdev_data = NULL;
+	tdm_error ret;
+	int i = 0;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(caps, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(caps, TDM_ERROR_INVALID_PARAMETER);
 
-    memset(caps, 0, sizeof(tdm_caps_output));
+	memset(caps, 0, sizeof(tdm_caps_output));
 
-    fbdev_data = fbdev_output->fbdev_data;
+	fbdev_data = fbdev_output->fbdev_data;
 
-    snprintf(caps->maker, TDM_NAME_LEN, "unknown");
-    snprintf(caps->model, TDM_NAME_LEN, "unknown");
-    snprintf(caps->name, TDM_NAME_LEN, "unknown");
+	snprintf(caps->maker, TDM_NAME_LEN, "unknown");
+	snprintf(caps->model, TDM_NAME_LEN, "unknown");
+	snprintf(caps->name, TDM_NAME_LEN, "unknown");
 
-    caps->status = fbdev_output->status;
-    caps->type = fbdev_output->connector_type;
-    caps->type_id = fbdev_output->connector_type_id;
+	caps->status = fbdev_output->status;
+	caps->type = fbdev_output->connector_type;
+	caps->type_id = fbdev_output->connector_type_id;
 
-    caps->mode_count = fbdev_output->count_modes;
-    caps->modes = calloc(caps->mode_count, sizeof(tdm_output_mode));
-    if (!caps->modes)
-    {
-        ret = TDM_ERROR_OUT_OF_MEMORY;
-        TDM_ERR("alloc failed\n");
-        goto failed_get;
-    }
+	caps->mode_count = fbdev_output->count_modes;
+	caps->modes = calloc(caps->mode_count, sizeof(tdm_output_mode));
+	if (!caps->modes) {
+		ret = TDM_ERROR_OUT_OF_MEMORY;
+		TDM_ERR("alloc failed\n");
+		goto failed_get;
+	}
 
-    for (i = 0; i < caps->mode_count; i++)
-        caps->modes[i] = fbdev_output->output_modes[i];
+	for (i = 0; i < caps->mode_count; i++)
+		caps->modes[i] = fbdev_output->output_modes[i];
 
-    caps->mmWidth = fbdev_data->vinfo->width;
-    caps->mmHeight = fbdev_data->vinfo->height;
-    caps->subpixel = -1;
+	caps->mmWidth = fbdev_data->vinfo->width;
+	caps->mmHeight = fbdev_data->vinfo->height;
+	caps->subpixel = -1;
 
-    caps->min_w = fbdev_output->width;
-    caps->min_h = fbdev_output->height;
-    caps->max_w = fbdev_output->max_width;
-    caps->max_h = fbdev_output->max_height;
-    caps->preferred_align = -1;
+	caps->min_w = fbdev_output->width;
+	caps->min_h = fbdev_output->height;
+	caps->max_w = fbdev_output->max_width;
+	caps->max_h = fbdev_output->max_height;
+	caps->preferred_align = -1;
 
-    /*
-     * Framebuffer does not have output properties
-     */
-    caps->prop_count = 0;
-    caps->props = NULL;
+	/*
+	 * Framebuffer does not have output properties
+	 */
+	caps->prop_count = 0;
+	caps->props = NULL;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 
 failed_get:
-    memset(caps, 0, sizeof(tdm_caps_output));
-    return ret;
+	memset(caps, 0, sizeof(tdm_caps_output));
+	return ret;
 }
 
 tdm_layer**
-fbdev_output_get_layers(tdm_output *output,  int *count, tdm_error *error)
+fbdev_output_get_layers(tdm_output *output, int *count, tdm_error *error)
 {
-    tdm_fbdev_output_data *fbdev_output= (tdm_fbdev_output_data *)output;
-    tdm_layer **layers;
-    tdm_error ret;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
+	tdm_layer **layers;
+	tdm_error ret;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, NULL);
-    RETURN_VAL_IF_FAIL(count, NULL);
+	RETURN_VAL_IF_FAIL(fbdev_output, NULL);
+	RETURN_VAL_IF_FAIL(count, NULL);
 
-    /*
-     * Framebuffer does not support layer, therefore create only
-     *  one layer by libtdm's demand;
-     */
-    *count = 1;
+	/*
+	 * Framebuffer does not support layer, therefore create only
+	 *  one layer by libtdm's demand;
+	 */
+	*count = 1;
 
-    layers = calloc(*count, sizeof(tdm_layer));
-    if (layers == NULL)
-    {
-        TDM_ERR("failed: alloc memory");
-        *count = 0;
-        ret = TDM_ERROR_OUT_OF_MEMORY;
-        goto failed_get;
-    }
+	layers = calloc(*count, sizeof(tdm_layer));
+	if (layers == NULL) {
+		TDM_ERR("failed: alloc memory");
+		*count = 0;
+		ret = TDM_ERROR_OUT_OF_MEMORY;
+		goto failed_get;
+	}
 
-    layers[0] = fbdev_output->fbdev_layer;;
+	layers[0] = fbdev_output->fbdev_layer;
 
-    if (error)
-        *error = TDM_ERROR_NONE;
+	if (error)
+		*error = TDM_ERROR_NONE;
 
-    return layers;
+	return layers;
 
 failed_get:
-    if (error)
-        *error = ret;
 
-    return NULL;
+	if (error)
+		*error = ret;
+
+	return NULL;
 }
 
 tdm_error
 fbdev_output_set_property(tdm_output *output, unsigned int id, tdm_value value)
 {
-    /*
-     * Framebuffer does not have output properties
-     */
-    return TDM_ERROR_NONE;
+	/*
+	 * Framebuffer does not have output properties
+	 */
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_get_property(tdm_output *output, unsigned int id, tdm_value *value)
 {
-    /*
-     * Framebuffer does not have output properties
-     */
-    return TDM_ERROR_NONE;
+	/*
+	 * Framebuffer does not have output properties
+	 */
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_wait_vblank(tdm_output *output, int interval, int sync, void *user_data)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
-    tdm_fbdev_data *fbdev_data;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
+	tdm_fbdev_data *fbdev_data;
 
-    int crtc = 0;
-    int ret;
+	int crtc = 0;
+	int ret;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
 
-    /*
-     * Frame buffer device does not support asynchronous events, that is
-     *  why clients must get responsibility on handling asynchronous
-     *  events.
-     */
-    if (!sync)
-    {
-        TDM_WRN("Framebuffer back end does not support asynchronous vblank");
-        return TDM_ERROR_NONE;
-    }
+	/*
+	 * Frame buffer device does not support asynchronous events, that is
+	 *  why clients must get responsibility on handling asynchronous
+	 *  events.
+	 */
+	if (!sync) {
+		TDM_WRN("Framebuffer back end does not support asynchronous vblank");
+		return TDM_ERROR_NONE;
+	}
 
-    fbdev_data = fbdev_output->fbdev_data;
+	fbdev_data = fbdev_output->fbdev_data;
 
-    ret = ioctl(fbdev_data->fbdev_fd, FBIO_WAITFORVSYNC, &crtc);
-    if (ret < 0)
-    {
-        TDM_ERR("FBIO_WAITFORVSYNC ioctl failed, errno=%d", errno);
-        return TDM_ERROR_OPERATION_FAILED;
-    }
+	ret = ioctl(fbdev_data->fbdev_fd, FBIO_WAITFORVSYNC, &crtc);
+	if (ret < 0) {
+		TDM_ERR("FBIO_WAITFORVSYNC ioctl failed, errno=%d", errno);
+		return TDM_ERROR_OPERATION_FAILED;
+	}
 
-    /*
-     * Up fake flag to simulate vsync event
-     */
-    fbdev_output->is_vblank = UP;
-    fbdev_output->user_data = user_data;
+	/*
+	 * Up fake flag to simulate vsync event
+	 */
+	fbdev_output->is_vblank = UP;
+	fbdev_output->user_data = user_data;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_set_vblank_handler(tdm_output *output, tdm_output_vblank_handler func)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(func, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(func, TDM_ERROR_INVALID_PARAMETER);
 
-    fbdev_output->vblank_func = func;
+	fbdev_output->vblank_func = func;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_commit(tdm_output *output, int sync, void *user_data)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
-    tdm_fbdev_layer_data *fbdev_layer;
-    tdm_fbdev_display_buffer *display_buffer;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
+	tdm_fbdev_layer_data *fbdev_layer;
+	tdm_fbdev_display_buffer *display_buffer;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
 
-    fbdev_layer = fbdev_output->fbdev_layer;
+	fbdev_layer = fbdev_output->fbdev_layer;
 
-    if (!fbdev_layer->display_buffer_changed)
-        return TDM_ERROR_NONE;
+	if (!fbdev_layer->display_buffer_changed)
+		return TDM_ERROR_NONE;
 
-    fbdev_output->mode_changed = 0;
-    fbdev_layer->display_buffer_changed = 0;
-    fbdev_layer->info_changed = 0;
+	fbdev_output->mode_changed = 0;
+	fbdev_layer->display_buffer_changed = 0;
+	fbdev_layer->info_changed = 0;
 
-    display_buffer = fbdev_layer->display_buffer;
+	display_buffer = fbdev_layer->display_buffer;
 
-    /*
-     * Display buffer's content to screen
-     */
-    memcpy(fbdev_output->mem, display_buffer->mem, display_buffer->size * sizeof(char) );
+	/*
+	 * Display buffer's content to screen
+	 */
+	memcpy(fbdev_output->mem, display_buffer->mem, display_buffer->size * sizeof(char));
 
-    if (fbdev_output->commit_func) 
-    {
-        TDM_ERR("trace");
-        fbdev_output->commit_func((tdm_output *)output, fbdev_output->sequence++, 0, 0, user_data);
-    }
+	if (fbdev_output->commit_func) {
+		TDM_ERR("trace");
+		fbdev_output->commit_func((tdm_output *) output, fbdev_output->sequence++, 0, 0, user_data);
+	}
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_set_commit_handler(tdm_output *output, tdm_output_commit_handler func)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(func, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(func, TDM_ERROR_INVALID_PARAMETER);
 
-    fbdev_output->commit_func = func;
+	fbdev_output->commit_func = func;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_set_dpms(tdm_output *output, tdm_output_dpms dpms_value)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
-    tdm_fbdev_data *fbdev_data;
-    int fbmode = 0;
-    int ret;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
+	tdm_fbdev_data *fbdev_data;
+	int fbmode = 0;
+	int ret;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
 
-    /*
-     * Bypass context switching overhead
-     */
-    if (fbdev_output->dpms_value == dpms_value)
-        return TDM_ERROR_NONE;
+	/*
+	 * Bypass context switching overhead
+	 */
+	if (fbdev_output->dpms_value == dpms_value)
+		return TDM_ERROR_NONE;
 
-    fbdev_data = fbdev_output->fbdev_data;
+	fbdev_data = fbdev_output->fbdev_data;
 
-    switch (dpms_value)
-    {
-        case TDM_OUTPUT_DPMS_ON:
-            fbmode = FB_BLANK_UNBLANK;
-            break;
+	switch (dpms_value) {
+	case TDM_OUTPUT_DPMS_ON:
+		fbmode = FB_BLANK_UNBLANK;
+		break;
 
-        case TDM_OUTPUT_DPMS_OFF:
-            fbmode = FB_BLANK_POWERDOWN;
-            break;
+	case TDM_OUTPUT_DPMS_OFF:
+		fbmode = FB_BLANK_POWERDOWN;
+		break;
 
-        case TDM_OUTPUT_DPMS_STANDBY:
-            fbmode = FB_BLANK_VSYNC_SUSPEND;
-            break;
+	case TDM_OUTPUT_DPMS_STANDBY:
+		fbmode = FB_BLANK_VSYNC_SUSPEND;
+		break;
 
-        case TDM_OUTPUT_DPMS_SUSPEND:
-            fbmode = FB_BLANK_HSYNC_SUSPEND;
-            break;
+	case TDM_OUTPUT_DPMS_SUSPEND:
+		fbmode = FB_BLANK_HSYNC_SUSPEND;
+		break;
 
-        default:
-            NEVER_GET_HERE();
-            break;
-    }
+	default:
+		NEVER_GET_HERE();
+		break;
+	}
 
-    ret = ioctl(fbdev_data->fbdev_fd, FBIOBLANK, &fbmode);
-    if (ret < 0)
-    {
-        TDM_ERR("FBIOBLANK ioctl failed, errno=%d", errno);
-        return TDM_ERROR_OPERATION_FAILED;
-    }
+	ret = ioctl(fbdev_data->fbdev_fd, FBIOBLANK, &fbmode);
+	if (ret < 0) {
+		TDM_ERR("FBIOBLANK ioctl failed, errno=%d", errno);
+		return TDM_ERROR_OPERATION_FAILED;
+	}
 
-    /*
-     * TODO: framebuffer have to be reinitialized again, Maybe
-     */
+	/*
+	 * TODO: framebuffer have to be reinitialized again, Maybe
+	 */
 
-    fbdev_output->dpms_value = dpms_value;
-    fbmode = 0;
+	fbdev_output->dpms_value = dpms_value;
+	fbmode = 0;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_get_dpms(tdm_output *output, tdm_output_dpms *dpms_value)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(dpms_value, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(dpms_value, TDM_ERROR_INVALID_PARAMETER);
 
-    *dpms_value = fbdev_output->dpms_value;
+	*dpms_value = fbdev_output->dpms_value;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_set_mode(tdm_output *output, const tdm_output_mode *mode)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(mode, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(mode, TDM_ERROR_INVALID_PARAMETER);
 
-    /*
-     * We currently support only one mode
-     */
-    if (fbdev_output->count_modes == 1)
-        return TDM_ERROR_NONE;
+	/*
+	 * We currently support only one mode
+	 */
+	if (fbdev_output->count_modes == 1)
+		return TDM_ERROR_NONE;
 
-    /*
-     * TODO: Implement mode switching
-     */
-    fbdev_output->mode_changed = 0;
+	/*
+	 * TODO: Implement mode switching
+	 */
+	fbdev_output->mode_changed = 0;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_output_get_mode(tdm_output *output, const tdm_output_mode **mode)
 {
-    tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
+	tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *) output;
 
-    RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(mode, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(mode, TDM_ERROR_INVALID_PARAMETER);
 
-    *mode = fbdev_output->current_mode;
+	*mode = fbdev_output->current_mode;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_layer_get_capability(tdm_layer *layer, tdm_caps_layer *caps)
 {
-    tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *) layer;
-    tdm_error ret;
-    int i;
+	tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *) layer;
+	tdm_error ret;
+	int i;
 
-    RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(caps, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(caps, TDM_ERROR_INVALID_PARAMETER);
 
-    memset(caps, 0, sizeof(tdm_caps_layer));
+	memset(caps, 0, sizeof(tdm_caps_layer));
 
-    caps->capabilities = fbdev_layer->capabilities;
+	caps->capabilities = fbdev_layer->capabilities;
 
-    /*
-     * Make our single GRAPHIC layer the lowest one aka "Prime"
-     */
-    caps->zpos = 0;
+	/*
+	 * Make our single GRAPHIC layer the lowest one aka "Prime"
+	 */
+	caps->zpos = 0;
 
-    caps->format_count = sizeof(supported_formats)/sizeof(supported_formats[0]);
-    caps->formats = calloc(caps->format_count, sizeof(tbm_format));
-    if (!caps->formats)
-    {
-        ret = TDM_ERROR_OUT_OF_MEMORY;
-        TDM_ERR("alloc failed\n");
-        goto failed_get;
-    }
+	caps->format_count = sizeof(supported_formats) / sizeof(supported_formats[0]);
+	caps->formats = calloc(caps->format_count, sizeof(tbm_format));
+	if (!caps->formats) {
+		ret = TDM_ERROR_OUT_OF_MEMORY;
+		TDM_ERR("alloc failed\n");
+		goto failed_get;
+	}
 
-    for( i = 0; i < caps->format_count; i++)
-        caps->formats[i] = supported_formats[i];
+	for (i = 0; i < caps->format_count; i++)
+		caps->formats[i] = supported_formats[i];
 
-    /*
-     * Framebuffer does not have layer properties
-     */
-    caps->prop_count = 0;
-    caps->props = NULL;
+	/*
+	 * Framebuffer does not have layer properties
+	 */
+	caps->prop_count = 0;
+	caps->props = NULL;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 
 failed_get:
 
-    memset(caps, 0, sizeof(tdm_caps_layer));
-    return ret;
+	memset(caps, 0, sizeof(tdm_caps_layer));
+	return ret;
 }
 
 tdm_error
 fbdev_layer_set_property(tdm_layer *layer, unsigned int id, tdm_value value)
 {
-   /*
-    * Framebuffer does not have layer properties
-    */
-    return TDM_ERROR_NONE;
+	/*
+	 * Framebuffer does not have layer properties
+	 */
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_layer_get_property(tdm_layer *layer, unsigned int id, tdm_value *value)
 {
-    /*
-     * Framebuffer does not have layer properties
-     */
-    return TDM_ERROR_NONE;
+	/*
+	 * Framebuffer does not have layer properties
+	 */
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_layer_set_info(tdm_layer *layer, tdm_info_layer *info)
 {
-    tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *)layer;
+	tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *) layer;
 
-    RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(info, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(info, TDM_ERROR_INVALID_PARAMETER);
 
-    fbdev_layer->info = *info;
+	fbdev_layer->info = *info;
 
-    /*
-     * We do not use info in this backend, therefore just ignore
-     *  info's changing
-     */
-    fbdev_layer->info_changed = 0;
+	/*
+	 * We do not use info in this backend, therefore just ignore
+	 *  info's changing
+	 */
+	fbdev_layer->info_changed = 0;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_layer_get_info(tdm_layer *layer, tdm_info_layer *info)
 {
-    tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *)layer;
+	tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *) layer;
 
-    RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(info, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(info, TDM_ERROR_INVALID_PARAMETER);
 
-    *info = fbdev_layer->info;
+	*info = fbdev_layer->info;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_layer_set_buffer(tdm_layer *layer, tbm_surface_h buffer)
 {
-    tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *)layer;
-    tdm_fbdev_display_buffer *display_buffer;
-    tdm_fbdev_data *fbdev_data;
-    int opt = 0;
-    unsigned int format;
-    tbm_bo bo;
-    tbm_bo_handle bo_handle;
-    tdm_error err = TDM_ERROR_NONE;
+	tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *) layer;
+	tdm_fbdev_display_buffer *display_buffer;
+	tdm_fbdev_data *fbdev_data;
+	int opt = 0;
+	unsigned int format;
+	tbm_bo bo;
+	tbm_bo_handle bo_handle;
+	tdm_error err = TDM_ERROR_NONE;
 
-    RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(buffer, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(buffer, TDM_ERROR_INVALID_PARAMETER);
 
-    if (tbm_surface_internal_get_num_bos(buffer) > 1)
-    {
-        TDM_ERR("Framebuffer backend does not support surfaces with more than one bos");
-        return TDM_ERROR_INVALID_PARAMETER;
-    }
+	if (tbm_surface_internal_get_num_bos(buffer) > 1) {
+		TDM_ERR("Framebuffer backend does not support surfaces with more than one bos");
+		return TDM_ERROR_INVALID_PARAMETER;
+	}
 
-    fbdev_data = fbdev_layer->fbdev_data;
+	fbdev_data = fbdev_layer->fbdev_data;
 
-    display_buffer = _tdm_fbdev_display_find_buffer(fbdev_data, buffer);
-    if(!display_buffer)
-    {
-        display_buffer = calloc(1, sizeof(tdm_fbdev_display_buffer));
-        if (display_buffer == NULL)
-        {
-            TDM_ERR("alloc failed");
-            return TDM_ERROR_OUT_OF_MEMORY;
-        }
+	display_buffer = _tdm_fbdev_display_find_buffer(fbdev_data, buffer);
+	if (!display_buffer) {
+		display_buffer = calloc(1, sizeof(tdm_fbdev_display_buffer));
+		if (display_buffer == NULL) {
+			TDM_ERR("alloc failed");
+			return TDM_ERROR_OUT_OF_MEMORY;
+		}
 
-        display_buffer->buffer = buffer;
+		display_buffer->buffer = buffer;
 
-        err = tdm_buffer_add_destroy_handler(buffer, _tdm_fbdev_display_cb_destroy_buffer, fbdev_data);
-        if (err != TDM_ERROR_NONE)
-        {
-            TDM_ERR("add destroy handler fail");
-            free(display_buffer);
-            return TDM_ERROR_OPERATION_FAILED;
-        }
+		err = tdm_buffer_add_destroy_handler(buffer, _tdm_fbdev_display_cb_destroy_buffer, fbdev_data);
+		if (err != TDM_ERROR_NONE) {
+			TDM_ERR("add destroy handler fail");
+			free(display_buffer);
+			return TDM_ERROR_OPERATION_FAILED;
+		}
 
-        LIST_ADDTAIL(&display_buffer->link, &fbdev_data->buffer_list);
-    }
+		LIST_ADDTAIL(&display_buffer->link, &fbdev_data->buffer_list);
+	}
 
-    if (display_buffer->mem == NULL)
-    {
-        display_buffer->width = tbm_surface_get_width(buffer);
-        display_buffer->height = tbm_surface_get_height(buffer);
+	if (display_buffer->mem == NULL) {
+		display_buffer->width = tbm_surface_get_width(buffer);
+		display_buffer->height = tbm_surface_get_height(buffer);
 
-        /*
-         * TODO: We have got drm format here, have to be checked whether
-         *  Framebuffer device supports this format.
-         *  Do we need it at all?
-         */
-        format = tbm_surface_get_format(buffer);
-        (void)format;
+		/*
+		 * TODO: We have got drm format here, have to be checked whether
+		 *  Framebuffer device supports this format.
+		 *  Do we need it at all?
+		 */
+		format = tbm_surface_get_format(buffer);
+		(void) format;
 
-        bo = tbm_surface_internal_get_bo(buffer, 0);
-        bo_handle = tbm_bo_map(bo, TBM_DEVICE_CPU, opt);
+		bo = tbm_surface_internal_get_bo(buffer, 0);
+		bo_handle = tbm_bo_map(bo, TBM_DEVICE_CPU, opt);
 
-        display_buffer->size = tbm_bo_size(bo);
+		display_buffer->size = tbm_bo_size(bo);
 
-        /*
-         * When surface will be about to be destroyed there will have been
-         *  invoked our destroy handler which will unmap bo and free
-         *  display_buffer memory
-         */
-        display_buffer->mem = bo_handle.ptr;
+		/*
+		 * When surface will be about to be destroyed there will have been
+		 *  invoked our destroy handler which will unmap bo and free
+		 *  display_buffer memory
+		 */
+		display_buffer->mem = bo_handle.ptr;
 
-        TDM_DBG("mmap success");
-    }
+		TDM_DBG("mmap success");
+	}
 
-    fbdev_layer->display_buffer = display_buffer;
-    fbdev_layer->display_buffer_changed = 1;
+	fbdev_layer->display_buffer = display_buffer;
+	fbdev_layer->display_buffer_changed = 1;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
 
 tdm_error
 fbdev_layer_unset_buffer(tdm_layer *layer)
 {
-    tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *)layer;
+	tdm_fbdev_layer_data *fbdev_layer = (tdm_fbdev_layer_data *) layer;
 
-    RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
+	RETURN_VAL_IF_FAIL(fbdev_layer, TDM_ERROR_INVALID_PARAMETER);
 
-    fbdev_layer->display_buffer = NULL;
-    fbdev_layer->display_buffer_changed = 1;
+	fbdev_layer->display_buffer = NULL;
+	fbdev_layer->display_buffer_changed = 1;
 
-    return TDM_ERROR_NONE;
+	return TDM_ERROR_NONE;
 }
