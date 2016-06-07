@@ -191,8 +191,10 @@ tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 	/*
 	 * We currently support only one mode
 	 */
-	if (output->count_modes == 1)
+	if (output->count_modes == 1) {
 		output->current_mode = &output->output_modes[0];
+		output->status = TDM_OUTPUT_CONN_STATUS_MODE_SETTED;
+	}
 
 	output->fbdev_data = fbdev_data;
 	fbdev_data->fbdev_output = output;
