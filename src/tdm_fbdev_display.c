@@ -9,6 +9,8 @@
 #include <xf86drm.h>
 #include <libudev.h>
 
+#define DRM_MASTER_NODE "/dev/dri/card0"
+
 /*
  * Framebuffer device supported formats
  */
@@ -91,6 +93,71 @@ _tdm_fbdev_layer_is_supproted_format()
 }
 */
 
+tdm_error fbdev_display_get_fd(tdm_backend_data *bdata, int *fd)
+{
+    tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *)bdata;
+    int file_fd;
+
+    RETURN_VAL_IF_FAIL(fbdev_data, TDM_ERROR_INVALID_PARAMETER);
+    RETURN_VAL_IF_FAIL(fd, TDM_ERROR_INVALID_PARAMETER);
+
+    file_fd = open(DRM_MASTER_NODE, O_RDWR, ACCESSPERMS);
+    if (file_fd < 0) {
+	    TDM_ERR("Can't open drm master device\n");
+	    return TDM_ERROR_OPERATION_FAILED;
+
+    }
+    TDM_INFO("Open not os fake file %s: %d", DRM_MASTER_NODE, file_fd);
+
+    tdm_helper_set_fd("TDM_DRM_MASTER_FD", file_fd);
+
+    *fd = file_fd;
+
+    return TDM_ERROR_NONE;
+}
+
+static inline uint32_t
+_get_refresh (struct fb_var_screeninfo *timing)
+{
+    uint32_t pixclock, hfreq, htotal, vtotal;
+
+    pixclock = PICOS2KHZ(timing->pixclock) * 1000;
+
+    htotal = timing->xres + timing->right_margin + timing->hsync_len + timing->left_margin;
+    vtotal = timing->yres + timing->lower_margin + timing->vsync_len + timing->upper_margin;
+
+    if (timing->vmode & FB_VMODE_INTERLACED) vtotal /= 2;
+    if (timing->vmode & FB_VMODE_DOUBLE) vtotal *= 2;
+
+    hfreq = pixclock / htotal;
+    return hfreq / vtotal;
+}
+
+/*
+ * Convert fb_var_screeninfo to tdm_output_mode
+ */
+static inline void
+_tdm_fbdev_display_to_tdm_mode(struct fb_var_screeninfo *timing, tdm_output_mode *mode)
+{
+
+    if (!timing->pixclock) return;
+
+    mode->clock = timing->pixclock / 1000;
+    mode->vrefresh = _get_refresh (timing);
+    mode->hdisplay = timing->xres;
+    mode->hsync_start = mode->hdisplay + timing->right_margin;
+    mode->hsync_end = mode->hsync_start + timing->hsync_len;
+    mode->htotal = mode->hsync_end + timing->left_margin;
+
+    mode->vdisplay = timing->yres;
+    mode->vsync_start = mode->vdisplay + timing->lower_margin;
+    mode->vsync_end = mode->vsync_start + timing->vsync_len;
+    mode->vtotal = mode->vsync_end + timing->upper_margin;
+
+    int interlaced = !!(timing->vmode & FB_VMODE_INTERLACED);
+    snprintf (mode->name, TDM_NAME_LEN, "%dx%d%s", mode->hdisplay, mode->vdisplay, interlaced ? "i" : "");
+}
+
 tdm_error
 tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 {
@@ -138,6 +205,7 @@ tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 
     output->is_vblank = DOWN;
     output->is_commit = DOWN;
+    output->sequence  = 1;
 
     /*
      * TODO: connector_type_id field relates to libdrm connector which framebuffer
@@ -156,11 +224,7 @@ tdm_fbdev_creat_output(tdm_fbdev_data *fbdev_data)
 
     for(i = 0; i < output->count_modes ; i++)
     {
-        output->output_modes[i].hdisplay = fbdev_data->vinfo->xres;
-        output->output_modes[i].vdisplay = fbdev_data->vinfo->yres;
-        output->output_modes[i].vrefresh = 60;
-        output->output_modes[i].flags = -1;
-        output->output_modes[i].type = -1;
+        _tdm_fbdev_display_to_tdm_mode(fbdev_data->vinfo, &output->output_modes[i]);
 
         sprintf(output->output_modes[i].name, "%dx%d",
                 fbdev_data->vinfo->xres,
@@ -233,7 +297,10 @@ void
 tdm_fbdev_destroy_layer(tdm_fbdev_data *fbdev_data)
 {
     tdm_fbdev_output_data *fbdev_output = fbdev_data->fbdev_output;
-    tdm_fbdev_layer_data *layer = fbdev_output->fbdev_layer;
+    tdm_fbdev_layer_data *layer;
+    if (!fbdev_output)
+	    return;
+    layer = fbdev_output->fbdev_layer;
 
     if(layer != NULL)
         free(layer);
@@ -296,29 +363,6 @@ failed_get:
     if (error)
         *error = ret;
     return NULL;
-}
-
-tdm_error
-fbdev_display_get_fd(tdm_backend_data *bdata, int *fd)
-{
-    tdm_fbdev_data *fbdev_data = (tdm_fbdev_data *)bdata;
-    int file_fd;
-
-    RETURN_VAL_IF_FAIL(fbdev_data, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(fd, TDM_ERROR_INVALID_PARAMETER);
-
-    /*
-     * Event-based applications use poll/select for pageflip or vsync events,
-     *  since farmebuffer does not produce such events we create common file.
-     *  Without this file application will be locked on poll/select or return
-     *  an error after timer expiring.
-     */
-    file_fd = open("/tmp/tdm_fbdev_select", O_RDWR | O_CREAT | O_TRUNC, ACCESSPERMS);
-    TDM_INFO("Open fake file: /tmp/tdm_fbdev_select %d", file_fd);
-
-    *fd = file_fd;
-
-    return TDM_ERROR_NONE;
 }
 
 tdm_error
@@ -564,12 +608,11 @@ fbdev_output_commit(tdm_output *output, int sync, void *user_data)
      */
     memcpy(fbdev_output->mem, display_buffer->mem, display_buffer->size * sizeof(char) );
 
-
-    /*
-     * Up fake flag to simulate page flip event
-     */
-    fbdev_output->is_commit = UP;
-    fbdev_output->user_data = user_data;
+    if (fbdev_output->commit_func)
+    {
+        TDM_ERR("trace");
+        fbdev_output->commit_func((tdm_output *)output, fbdev_output->sequence++, 0, 0, user_data);
+    }
 
     return TDM_ERROR_NONE;
 }
@@ -686,7 +729,7 @@ fbdev_output_get_mode(tdm_output *output, const tdm_output_mode **mode)
     tdm_fbdev_output_data *fbdev_output = (tdm_fbdev_output_data *)output;
 
     RETURN_VAL_IF_FAIL(fbdev_output, TDM_ERROR_INVALID_PARAMETER);
-    RETURN_VAL_IF_FAIL(*mode, TDM_ERROR_INVALID_PARAMETER);
+    RETURN_VAL_IF_FAIL(mode, TDM_ERROR_INVALID_PARAMETER);
 
     *mode = fbdev_output->current_mode;
 
